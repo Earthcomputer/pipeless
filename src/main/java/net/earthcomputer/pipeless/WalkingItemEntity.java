@@ -30,6 +30,11 @@ public class WalkingItemEntity extends ItemEntity {
     private double lerpXRot;
     private int lerpSteps;
 
+    private float limbSwingAmount;
+    private float limbSwingSpeed;
+    private float prevLimbSwingAmount;
+    private float prevLimbSwingSpeed;
+
     public WalkingItemEntity(EntityType<? extends WalkingItemEntity> entityType, Level level) {
         super(entityType, level);
         this.navigator = level.isClientSide ? null : new NavigationMob(level);
@@ -130,6 +135,22 @@ public class WalkingItemEntity extends ItemEntity {
             this.setPos(newX, newY, newZ);
             this.setRot(this.getYRot(), this.getXRot());
         }
+
+        // animation
+        if (this.level.isClientSide) {
+            final boolean isFlying = false;
+            this.prevLimbSwingAmount = this.limbSwingAmount;
+            this.prevLimbSwingSpeed = this.limbSwingSpeed;
+            double dx = this.getX() - this.xo;
+            double dy = isFlying ? this.getY() - this.yo : 0;
+            double dz = this.getZ() - this.zo;
+            float targetSwingSpeed = (float) Math.sqrt(dx * dx + dy * dy + dz * dz) * 4;
+            if (targetSwingSpeed > 1) {
+                targetSwingSpeed = 1;
+            }
+            this.limbSwingSpeed += (targetSwingSpeed - this.limbSwingSpeed) * 0.4;
+            this.limbSwingAmount += this.limbSwingSpeed;
+        }
     }
 
     @Override
@@ -155,6 +176,14 @@ public class WalkingItemEntity extends ItemEntity {
     @Override
     public float getSpin(float pPartialTicks) {
         return -(float) Math.toRadians(getViewYRot(pPartialTicks));
+    }
+
+    public float getLimbSwingAmount(float partialTicks) {
+        return this.prevLimbSwingAmount + (this.limbSwingAmount - this.prevLimbSwingAmount) * partialTicks;
+    }
+
+    public float getLimbSwingSpeed(float partialTicks) {
+        return this.prevLimbSwingSpeed + (this.limbSwingSpeed - this.prevLimbSwingSpeed) * partialTicks;
     }
 
     private static class NavigationMob extends PathfinderMob {

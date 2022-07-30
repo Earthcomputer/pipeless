@@ -90,7 +90,7 @@ public class Pipeless {
 
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            EntityRenderers.register(Pipeless.WALKING_ITEM_ENTITY.get(), ItemEntityRenderer::new);
+            EntityRenderers.register(Pipeless.WALKING_ITEM_ENTITY.get(), WalkingItemEntityRenderer::new);
         }
     }
 }
