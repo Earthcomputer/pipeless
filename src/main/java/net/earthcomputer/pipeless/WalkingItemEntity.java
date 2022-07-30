@@ -1,7 +1,6 @@
 package net.earthcomputer.pipeless;
 
 import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
@@ -57,12 +56,7 @@ public class WalkingItemEntity extends ItemEntity {
     }
 
     public static boolean isHoldingTemptItem(LivingEntity entity) {
-        for (InteractionHand hand : InteractionHand.values()) {
-            if (entity.getItemInHand(hand).is(PipelessTags.Items.WALKING_ITEM_TEMPT)) {
-                return true;
-            }
-        }
-        return false;
+        return entity.isHolding(stack -> stack.is(PipelessTags.Items.WALKING_ITEM_TEMPT));
     }
 
     public static void onTemptingEntityTick(LivingEntity entity) {

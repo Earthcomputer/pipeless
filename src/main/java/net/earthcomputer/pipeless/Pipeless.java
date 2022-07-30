@@ -5,14 +5,17 @@ import net.minecraft.data.tags.BlockTagsProvider;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.data.event.GatherDataEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.LogicalSide;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -58,6 +61,18 @@ public class Pipeless {
         BlockTagsProvider blockTags = new PipelessBlockTagsProvider(event.getGenerator(), event.getExistingFileHelper());
         event.getGenerator().addProvider(event.includeServer(), blockTags);
         event.getGenerator().addProvider(event.includeServer(), new PipelessItemTagsProvider(event.getGenerator(), blockTags, event.getExistingFileHelper()));
+    }
+
+    @SubscribeEvent
+    public void onEntityInteractAt(PlayerInteractEvent.EntityInteractSpecific event) {
+        if (event.getSide() == LogicalSide.SERVER
+            && event.getItemStack().is(PipelessTags.Items.WALKING_ITEM_TEMPT)
+            && event.getTarget() instanceof ArmorStand armorStand
+            && !armorStand.isShowArms()
+        ) {
+            armorStand.setShowArms(true);
+            armorStand.interactAt(event.getEntity(), event.getLocalPos(), event.getHand());
+        }
     }
 
     @SubscribeEvent
