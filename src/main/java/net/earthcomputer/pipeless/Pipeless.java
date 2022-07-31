@@ -2,16 +2,19 @@ package net.earthcomputer.pipeless;
 
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraft.data.tags.BlockTagsProvider;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.data.event.GatherDataEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -50,6 +53,8 @@ public class Pipeless {
         ITEMS.register(modEventBus);
         ENTITY_TYPES.register(modEventBus);
 
+        PipelessNetwork.register();
+
         MinecraftForge.EVENT_BUS.register(this);
     }
 
@@ -71,7 +76,15 @@ public class Pipeless {
             && !armorStand.isShowArms()
         ) {
             armorStand.setShowArms(true);
+            // need to try interacting again, as this event happens after the interaction on the server
             armorStand.interactAt(event.getEntity(), event.getLocalPos(), event.getHand());
+        }
+    }
+
+    @SubscribeEvent
+    public void onEntityStartTracking(PlayerEvent.StartTracking event) {
+        if (event.getTarget() instanceof ItemEntity item) {
+            PipelessNetwork.updateClientBobOffset((ServerPlayer) event.getEntity(), item);
         }
     }
 

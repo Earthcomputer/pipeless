@@ -48,20 +48,25 @@ public class WalkingItemEntityRenderer extends ItemEntityRenderer {
     @Override
     public void render(ItemEntity pEntity_, float pEntityYaw, float pPartialTicks, PoseStack pMatrixStack, MultiBufferSource pBuffer, int pPackedLight) {
         WalkingItemEntity pEntity = (WalkingItemEntity) pEntity_;
-        renderHappyItem(pEntity, pPartialTicks, pMatrixStack, pBuffer, pPackedLight);
+        if (!pEntity.isFadingOut()) {
+            renderHappyItem(pEntity, pPartialTicks, pMatrixStack, pBuffer, pPackedLight);
+        }
 
         pMatrixStack.pushPose();
-        pMatrixStack.translate(0, ITEM_Y_OFFSET, 0);
-        cancelItemBobbing(pEntity, pPartialTicks, pMatrixStack);
+        setItemBobbingTranslation(pEntity, pPartialTicks, pMatrixStack);
         super.render(pEntity, pEntityYaw, pPartialTicks, pMatrixStack, pBuffer, pPackedLight);
         pMatrixStack.popPose();
     }
 
-    private void cancelItemBobbing(WalkingItemEntity pEntity, float pPartialTicks, PoseStack pMatrixStack) {
+    private void setItemBobbingTranslation(WalkingItemEntity pEntity, float pPartialTicks, PoseStack pMatrixStack) {
         // Forge's shouldBob method doesn't work, translate in the opposite direction to cancel the bobbing out
         // PR to fix (use Forge API once it's fixed): https://github.com/MinecraftForge/MinecraftForge/pull/8919
-        float f1 = Mth.sin(((float) pEntity.getAge() + pPartialTicks) / 10.0F + pEntity.bobOffs) * 0.1F + 0.1F;
-        pMatrixStack.translate(0.0D, -f1, 0.0D);
+        // we also add our custom bob offset here
+        float delta = pEntity.getFadeBlend(pPartialTicks);
+        float bobOffsetToCancel = Mth.sin(((float) pEntity.getAge() + pPartialTicks) / 10.0F + pEntity.bobOffs) * 0.1F + 0.1F;
+        float vanillaBobOffset = Mth.sin(((float) pEntity.getAge() + pPartialTicks) / 10.0F + pEntity.getTargetBobOffset()) * 0.1F + 0.1F;
+        float actualOffset = ITEM_Y_OFFSET * delta + vanillaBobOffset * (1 - delta);
+        pMatrixStack.translate(0.0D, actualOffset - bobOffsetToCancel, 0.0D);
     }
 
     private void renderHappyItem(WalkingItemEntity pEntity, float partialTicks, PoseStack pMatrix, MultiBufferSource pBuffer, int light) {

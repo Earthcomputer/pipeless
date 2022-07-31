@@ -1,5 +1,9 @@
 package net.earthcomputer.pipeless;
 
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityDimensions;
@@ -34,6 +38,10 @@ public class WalkingItemEntity extends ItemEntity {
     private float prevLimbSwingAmount;
     private float prevLimbSwingSpeed;
 
+    private static final int FADE_TIME = 20;
+    private static final EntityDataAccessor<Byte> STATE_DATA = SynchedEntityData.defineId(WalkingItemEntity.class, EntityDataSerializers.BYTE);
+    private int fadeTicks = FADE_TIME;
+
     public WalkingItemEntity(EntityType<? extends WalkingItemEntity> entityType, Level level) {
         super(entityType, level);
         this.navigator = level.isClientSide ? null : new NavigationMob(level);
@@ -41,11 +49,46 @@ public class WalkingItemEntity extends ItemEntity {
 
     public WalkingItemEntity(ItemEntity item) {
         super(Pipeless.WALKING_ITEM_ENTITY.get(), item.level);
-        if (item instanceof WalkingItemEntity walkingItem) {
-            this.target = walkingItem.target;
-        }
         this.navigator = level.isClientSide ? null : new NavigationMob(level);
         this.deserializeNBT(item.serializeNBT());
+        setRot((float) Math.toDegrees(-item.getSpin(1)), item.getXRot());
+        this.bobOffs = item.bobOffs;
+
+        if (item instanceof WalkingItemEntity walkingItem) {
+            this.target = walkingItem.target;
+        } else {
+            this.setState(State.FADE_IN);
+            this.fadeTicks = FADE_TIME;
+        }
+    }
+
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.getEntityData().define(STATE_DATA, (byte) State.FADE_IN.ordinal());
+    }
+
+    @Override
+    public void onSyncedDataUpdated(EntityDataAccessor<?> pKey) {
+        super.onSyncedDataUpdated(pKey);
+        if (pKey == STATE_DATA) {
+            if (getState() == State.NORMAL) {
+                this.fadeTicks = 0;
+            }
+        }
+    }
+
+    private State getState() {
+        byte index = this.getEntityData().get(STATE_DATA);
+        if (index >= 0 && index < State.VALUES.length) {
+            return State.VALUES[index];
+        } else {
+            return State.FADE_IN;
+        }
+    }
+
+    private void setState(State state) {
+        this.getEntityData().set(STATE_DATA, (byte) state.ordinal());
     }
 
     private void setTarget(@Nullable LivingEntity target) {
@@ -53,6 +96,20 @@ public class WalkingItemEntity extends ItemEntity {
         if (this.navigator != null) {
             this.navigator.target = target;
         }
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag pCompound) {
+        super.addAdditionalSaveData(pCompound);
+        pCompound.putByte("State", this.getEntityData().get(STATE_DATA));
+        pCompound.putInt("FadeTicks", this.fadeTicks);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag pCompound) {
+        super.readAdditionalSaveData(pCompound);
+        this.getEntityData().set(STATE_DATA, pCompound.getByte("State"));
+        this.fadeTicks = pCompound.getInt("FadeTicks");
     }
 
     public static boolean isHoldingTemptItem(LivingEntity entity) {
@@ -68,19 +125,54 @@ public class WalkingItemEntity extends ItemEntity {
             ItemEntity.class,
             new AABB(entity.position().subtract(FOLLOW_DISTANCE, FOLLOW_DISTANCE, FOLLOW_DISTANCE),
                 entity.position().add(FOLLOW_DISTANCE, FOLLOW_DISTANCE, FOLLOW_DISTANCE)),
-            ent -> !(ent instanceof WalkingItemEntity) && entity.distanceToSqr(ent) <= FOLLOW_DISTANCE * FOLLOW_DISTANCE
+            ent -> {
+                if (ent instanceof WalkingItemEntity walkingItem) {
+                    if (walkingItem.isFadingOut() || walkingItem.target == null) {
+                        return true;
+                    } else if (walkingItem.target == entity) {
+                        return false;
+                    } else {
+                        double distanceToThisSqr = walkingItem.distanceToSqr(entity);
+                        return distanceToThisSqr <= FOLLOW_DISTANCE * FOLLOW_DISTANCE
+                            && walkingItem.distanceToSqr(walkingItem.target) > distanceToThisSqr;
+                    }
+                }
+                return entity.distanceToSqr(ent) <= FOLLOW_DISTANCE * FOLLOW_DISTANCE
+                    && !entity.getPersistentData().getBoolean("PreventRemoteMovement");
+            }
         );
 
         for (ItemEntity item : items) {
-            item.discard();
-            WalkingItemEntity newEntity = new WalkingItemEntity(item);
-            newEntity.setTarget(entity);
-            entity.level.addFreshEntity(newEntity);
+            if (item instanceof WalkingItemEntity walkingItem) {
+                if (walkingItem.isFadingOut()) {
+                    walkingItem.setFadingIn();
+                }
+                walkingItem.target = entity;
+            } else {
+                item.discard();
+                WalkingItemEntity newEntity = new WalkingItemEntity(item);
+                newEntity.setTarget(entity);
+                entity.level.addFreshEntity(newEntity);
+            }
         }
     }
 
     @Override
     public void tick() {
+        if (this.isFadingOut()) {
+            if (!this.level.isClientSide && this.fadeTicks >= FADE_TIME) {
+                this.discard();
+                ItemEntity newEntity = new ItemEntity(EntityType.ITEM, this.level);
+                newEntity.deserializeNBT(this.serializeNBT());
+                newEntity.bobOffs = this.getTargetBobOffset();
+                this.level.addFreshEntity(newEntity);
+            } else {
+                this.fadeTicks++;
+                super.tick();
+            }
+            return;
+        }
+
         // check if target is still valid and turn into a normal item if not
         if (!this.level.isClientSide && (
                 this.target == null
@@ -90,11 +182,19 @@ public class WalkingItemEntity extends ItemEntity {
                 || !isHoldingTemptItem(this.target)
             )
         ) {
-            this.discard();
-            ItemEntity newEntity = new ItemEntity(EntityType.ITEM, this.level);
-            newEntity.deserializeNBT(this.serializeNBT());
-            this.level.addFreshEntity(newEntity);
+            if (this.getState() == State.NORMAL) {
+                this.fadeTicks = 0;
+            }
+            this.setState(State.FADE_OUT);
+            super.tick();
             return;
+        }
+
+        if (this.getState() == State.FADE_IN) {
+            if (!this.level.isClientSide && this.fadeTicks <= 0) {
+                this.setState(State.NORMAL);
+            }
+            this.fadeTicks--;
         }
 
 
@@ -178,6 +278,46 @@ public class WalkingItemEntity extends ItemEntity {
 
     public float getLimbSwingSpeed(float partialTicks) {
         return this.prevLimbSwingSpeed + (this.limbSwingSpeed - this.prevLimbSwingSpeed) * partialTicks;
+    }
+
+    /**
+     * Gets the bob offset that this item is about to fade into, if applicable
+     */
+    public float getTargetBobOffset() {
+        if (this.getState() == State.FADE_OUT) {
+            // spin = (age + 1) / 20 + bobOffs
+            // rearrange:
+            // bobOffs = spin - (age + 1) / 20
+            return this.getSpin(1) - (this.getAge() + 1) / 20f;
+        } else {
+            return this.bobOffs;
+        }
+    }
+
+    public float getFadeBlend(float partialTicks) {
+        if (this.getState() == State.NORMAL) {
+            return 1;
+        }
+
+        float progress = this.getState() == State.FADE_IN ? this.fadeTicks - partialTicks : this.fadeTicks + partialTicks;
+        return (float) ((Math.cos(progress * (Math.PI / FADE_TIME)) + 1) * 0.5);
+    }
+
+    public boolean isFadingOut() {
+        return this.getState() == State.FADE_OUT;
+    }
+
+    public void setFadingIn() {
+        this.setState(State.FADE_IN);
+    }
+
+    public enum State {
+        FADE_IN,
+        NORMAL,
+        FADE_OUT,
+        ;
+
+        private static final State[] VALUES = values();
     }
 
     private static class NavigationMob extends PathfinderMob {
