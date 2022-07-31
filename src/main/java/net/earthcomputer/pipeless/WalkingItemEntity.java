@@ -4,6 +4,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityDimensions;
@@ -143,6 +144,16 @@ public class WalkingItemEntity extends ItemEntity {
         );
 
         for (ItemEntity item : items) {
+            item.level.playSound(
+                null,
+                item.getX(),
+                item.getY(),
+                item.getZ(),
+                Pipeless.WALKING_ITEM_APPEAR_SOUND.get(),
+                SoundSource.NEUTRAL,
+                0.2f,
+                (entity.getRandom().nextFloat() - entity.getRandom().nextFloat()) * 1.4f + 2f
+            );
             if (item instanceof WalkingItemEntity walkingItem) {
                 if (walkingItem.isFadingOut()) {
                     walkingItem.setFadingIn();

@@ -1,4 +1,5 @@
 {
   "entity.pipeless.walking_item": "Walking Item",
-  "item.pipeless.attractive_chest": "Attractive Chest"
+  "item.pipeless.attractive_chest": "Attractive Chest",
+  "subtitles.pipeless.entity.walking_item.appear": "Walking Item Appears"
 }

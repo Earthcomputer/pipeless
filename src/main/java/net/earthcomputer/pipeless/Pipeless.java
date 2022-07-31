@@ -2,7 +2,9 @@ package net.earthcomputer.pipeless;
 
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraft.data.tags.BlockTagsProvider;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
@@ -32,6 +34,7 @@ public class Pipeless {
     public static final String MODID = "pipeless";
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MODID);
+    public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MODID);
 
     public static final RegistryObject<Item> ATTRACTIVE_CHEST_ITEM = ITEMS.register("attractive_chest",
         () -> new Item(new Item.Properties()
@@ -45,6 +48,9 @@ public class Pipeless {
             .clientTrackingRange(6)
             .build("walking_item"));
 
+    public static final RegistryObject<SoundEvent> WALKING_ITEM_APPEAR_SOUND = SOUND_EVENTS.register("entity.walking_item.appear",
+        () -> new SoundEvent(new ResourceLocation(MODID, "entity.walking_item.appear"), WalkingItemEntity.FOLLOW_DISTANCE + 1));
+
     public Pipeless() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
@@ -52,6 +58,7 @@ public class Pipeless {
 
         ITEMS.register(modEventBus);
         ENTITY_TYPES.register(modEventBus);
+        SOUND_EVENTS.register(modEventBus);
 
         PipelessNetwork.register();
 
@@ -60,6 +67,7 @@ public class Pipeless {
 
     private void gatherData(final GatherDataEvent event) {
         event.getGenerator().addProvider(event.includeClient(), new PipelessItemModelProvider(event.getGenerator(), event.getExistingFileHelper()));
+        event.getGenerator().addProvider(event.includeClient(), new PipelessSoundProvider(event.getGenerator(), event.getExistingFileHelper()));
         event.getGenerator().addProvider(event.includeClient(), new PipelessLanguageProvider(event.getGenerator()));
 
         event.getGenerator().addProvider(event.includeServer(), new PipelessRecipeProvider(event.getGenerator()));

@@ -1,0 +1,8 @@
+{
+  "entity.walking_item.appear": {
+    "sounds": [
+      "random/pop"
+    ],
+    "subtitle": "subtitles.pipeless.entity.walking_item.appear"
+  }
+}
